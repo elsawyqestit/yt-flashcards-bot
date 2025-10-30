@@ -1,0 +1,43 @@
+name: Deploy to Railway
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli@latest
+
+      - name: Deploy via Railway CLI
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: |
+          set -e
+          echo "Whoami"
+          railway whoami || true
+
+          echo "Create project if missing"
+          railway project create --name "${{ secrets.RAILWAY_PROJECT_NAME }}" || true
+
+          echo "Init in CI"
+          railway init --ci || true
+
+          echo "Set env variables"
+          railway variables set TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} YT_API_KEY=${YT_API_KEY} DB_FILE=/data/db.json || true
+
+          echo "Create volume for persistence"
+          railway volume create --name data --mountPath /data || true
+
+          echo "Deploy"
+          railway up --yes --detached || railway up --yes
